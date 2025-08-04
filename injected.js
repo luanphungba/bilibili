@@ -415,13 +415,13 @@
     }
     
     async analyzeWithChatGPT(text, apiKey) {
-      // Send message to content script to get custom prompt
+      // Send message to content script to get custom prompt and model
       return new Promise((resolve, reject) => {
         const messageHandler = (event) => {
           if (event.data.type === 'BILIBILI_PROMPT_RESPONSE') {
             window.removeEventListener('message', messageHandler);
             
-            const { customPrompt } = event.data;
+            const { customPrompt, openaiModel } = event.data;
             let prompt = customPrompt || `Please analyze this Chinese text and provide the following information in a structured format:
 
 Text: "{text}"
@@ -438,6 +438,9 @@ Format the response in HTML with clear sections.`;
             // Replace {text} placeholder with actual text
             prompt = prompt.replace('{text}', text);
 
+            // Use the selected model or default to gpt-3.5-turbo
+            const model = openaiModel || 'gpt-3.5-turbo';
+
             fetch('https://api.openai.com/v1/chat/completions', {
               method: 'POST',
               headers: {
@@ -445,7 +448,7 @@ Format the response in HTML with clear sections.`;
                 'Authorization': `Bearer ${apiKey}`
               },
               body: JSON.stringify({
-                model: selectedModel,
+                model: model,
                 messages: [
                   {
                     role: 'system',
@@ -474,7 +477,7 @@ Format the response in HTML with clear sections.`;
         
         window.addEventListener('message', messageHandler);
         
-        // Request custom prompt from content script
+        // Request custom prompt and model from content script
         window.postMessage({
           type: 'BILIBILI_PROMPT_REQUEST',
           action: 'getCustomPrompt'

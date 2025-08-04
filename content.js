@@ -153,18 +153,21 @@ window.addEventListener('message', async (event) => {
     
     if (action === 'getCustomPrompt') {
       try {
-        const result = await chrome.storage.sync.get(['customPrompt']);
+        const result = await chrome.storage.sync.get(['customPrompt', 'openaiModel']);
         const customPrompt = result.customPrompt;
+        const openaiModel = result.openaiModel;
         
         window.postMessage({
           type: 'BILIBILI_PROMPT_RESPONSE',
-          customPrompt: customPrompt
+          customPrompt: customPrompt,
+          openaiModel: openaiModel
         }, '*');
       } catch (error) {
         console.error('Error getting custom prompt:', error);
         window.postMessage({
           type: 'BILIBILI_PROMPT_RESPONSE',
-          customPrompt: null
+          customPrompt: null,
+          openaiModel: null
         }, '*');
       }
     }
