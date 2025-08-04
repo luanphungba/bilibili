@@ -42,7 +42,7 @@
     }
     textarea {
       resize: vertical;
-      min-height: 60px;
+      min-height: 80px;
     }
     .button-group {
       display: flex;
@@ -64,20 +64,6 @@
     .btn-primary:hover {
       background: #0091c2;
     }
-    .btn-secondary {
-      background: #6c757d;
-      color: white;
-    }
-    .btn-secondary:hover {
-      background: #5a6268;
-    }
-    .btn-danger {
-      background: #dc3545;
-      color: white;
-    }
-    .btn-danger:hover {
-      background: #c82333;
-    }
     .status {
       padding: 8px;
       border-radius: 4px;
@@ -94,11 +80,36 @@
       color: #721c24;
       border: 1px solid #f5c6cb;
     }
-    .settings-section {
-      margin-top: 15px;
-    }
     .api-key-input {
       font-family: monospace;
+    }
+    .variables-list {
+      background: #f0f0f0;
+      padding: 10px;
+      border-radius: 4px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .variables-list h4 {
+      margin: 0 0 8px 0;
+      font-size: 13px;
+      color: #333;
+    }
+    .variable-item {
+      margin-bottom: 4px;
+      color: #666;
+    }
+    .template-preview {
+      background: #fff;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 8px;
+      margin-top: 8px;
+      font-size: 12px;
+      font-family: monospace;
+      max-height: 100px;
+      overflow-y: auto;
     }
   </style>
 </head>
@@ -106,55 +117,75 @@
   <div class="container">
     <h2>Bilibili Language Learning Loop</h2>
     
-    <!-- Video Loop Control -->
-    <div class="section">
-      <h3>Video Loop Control</h3>
-      <div class="form-group">
-        <label for="startTime">Start Time (seconds):</label>
-        <input type="number" id="startTime" placeholder="0" min="0">
-      </div>
-      <div class="form-group">
-        <label for="endTime">End Time (seconds):</label>
-        <input type="number" id="endTime" placeholder="60" min="0">
-      </div>
-      <div class="button-group">
-        <button id="startLoop" class="btn-primary">Start Loop</button>
-        <button id="stopLoop" class="btn-secondary">Stop Loop</button>
-      </div>
-      <div id="loopStatus" class="status" style="display: none;"></div>
-    </div>
-
-    <!-- Language Learning -->
-    <div class="section">
-      <h3>Language Learning</h3>
-      <div class="form-group">
-        <label for="chineseText">Chinese Text:</label>
-        <textarea id="chineseText" placeholder="Enter Chinese text to analyze..."></textarea>
-      </div>
-      <div class="button-group">
-        <button id="analyzeText" class="btn-primary">Analyze with ChatGPT</button>
-        <button id="addToAnki" class="btn-secondary">Add to Anki</button>
-      </div>
-      <div id="analysisResult" style="margin-top: 10px; display: none;">
-        <h4>Analysis Result:</h4>
-        <div id="analysisContent" style="background: white; padding: 10px; border-radius: 4px; border: 1px solid #ddd; max-height: 200px; overflow-y: auto;"></div>
-      </div>
-    </div>
-
     <!-- Settings -->
-    <div class="section settings-section">
+    <div class="section">
       <h3>Settings</h3>
       <div class="form-group">
         <label for="openaiKey">OpenAI API Key:</label>
         <input type="password" id="openaiKey" class="api-key-input" placeholder="sk-...">
       </div>
       <div class="form-group">
+        <label for="openaiModel">AI Model:</label>
+        <select id="openaiModel" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;">
+          <option value="gpt-3.5-turbo">GPT-3.5 Turbo (Cheapest)</option>
+          <option value="gpt-4">GPT-4 (Better Quality)</option>
+          <option value="gpt-4-turbo">GPT-4 Turbo (Best Quality)</option>
+          <option value="gpt-4o">GPT-4o (Latest)</option>
+          <option value="gpt-4o-mini">GPT-4o Mini (Fast & Cheap)</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="customPrompt">Custom Analysis Prompt:</label>
+        <textarea id="customPrompt" placeholder="Enter your custom prompt for Chinese text analysis...">Please analyze this Chinese text and provide the following information in a structured format:
+
+Text: "{text}"
+
+Please provide:
+1. **Pinyin**: The pronunciation in pinyin
+2. **Vietnamese Translation**: Translation to Vietnamese (tiếng Việt)
+3. **Grammar Notes**: Key grammar points and explanations
+4. **Vocabulary**: Important words and their meanings
+5. **Usage Examples**: How to use this text in context
+
+Format the response in HTML with clear sections.</textarea>
+      </div>
+      <div class="form-group">
         <label for="ankiDeck">Anki Deck Name:</label>
         <input type="text" id="ankiDeck" placeholder="Chinese Learning">
       </div>
+      
+      <!-- Template Settings -->
+      <div class="form-group">
+        <label for="frontTemplate">Front Template:</label>
+        <textarea id="frontTemplate" placeholder="Enter front template with variables...">Chinese Text: {{chineseText}}
+
+Loop: {{startTime}}s - {{endTime}}s</textarea>
+        <div class="template-preview" id="frontPreview"></div>
+      </div>
+      
+      <div class="form-group">
+        <label for="backTemplate">Back Template:</label>
+        <textarea id="backTemplate" placeholder="Enter back template with variables...">{{analysis}}
+
+<a href="{{loopUrl}}" target="_blank">Watch Loop</a></textarea>
+        <div class="template-preview" id="backPreview"></div>
+      </div>
+      
+      <div class="variables-list">
+        <h4>Available Variables:</h4>
+        <div class="variable-item">{{chineseText}} - The Chinese text to analyze</div>
+        <div class="variable-item">{{analysis}} - The ChatGPT analysis (HTML formatted)</div>
+        <div class="variable-item">{{loopUrl}} - Clickable loop URL</div>
+        <div class="variable-item">{{startTime}} - Loop start time in seconds</div>
+        <div class="variable-item">{{endTime}} - Loop end time in seconds</div>
+        <div class="variable-item">{{videoTitle}} - Video title</div>
+        <div class="variable-item">{{currentUrl}} - Current page URL</div>
+      </div>
+      
       <div class="button-group">
         <button id="saveSettings" class="btn-primary">Save Settings</button>
       </div>
+      <div id="settingsStatus" class="status" style="display: none;"></div>
     </div>
   </div>
 
