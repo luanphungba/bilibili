@@ -51,6 +51,18 @@ A Chrome extension for looping Bilibili videos with integrated language learning
 2. Download [AnkiConnect](https://foosoft.github.io/anki-connect/) addon
 3. Install the addon in Anki (Tools > Add-ons > Install Add-on)
 4. Restart Anki
+5. **Configure AnkiConnect Security** (Required for extension to work):
+   - Open Anki
+   - Go to Tools > Add-ons
+   - Find "AnkiConnect" and click "Config"
+   - Add the following to the "webCorsOriginList" array:
+     ```json
+     [
+       "*"
+     ]
+     ```
+   - Click "OK" to save
+   - Restart Anki for changes to take effect
 
 ## Usage
 
@@ -200,6 +212,10 @@ The extension uses enhanced video detection with multiple selectors:
 2. **Anki Running**: Make sure Anki is open and running
 3. **Port 8765**: AnkiConnect runs on localhost:8765 by default
 4. **Template Variables**: Check that template variables are correctly formatted
+5. **CORS Configuration**: Ensure AnkiConnect is configured to allow Chrome extensions:
+   - Open Anki > Tools > Add-ons > AnkiConnect > Config
+   - Verify "webCorsOriginList" includes `"*"` for maximum compatibility
+   - Restart Anki after configuration changes
 
 ### Template Issues
 1. **Variable Syntax**: Use double curly braces: `{{variableName}}`

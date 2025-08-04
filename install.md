@@ -33,6 +33,20 @@
 2. Download AnkiConnect addon from https://foosoft.github.io/anki-connect/
 3. Install the addon in Anki (Tools > Add-ons > Install Add-on)
 4. Restart Anki
+5. **Configure AnkiConnect Security** (Required for extension to work):
+   - Open Anki
+   - Go to Tools > Add-ons
+   - Find "AnkiConnect" and click "Config"
+   - Add the following to the "webCorsOriginList" array:
+     ```json
+     [
+       "chrome-extension://*",
+       "moz-extension://*",
+       "http://localhost:8765"
+     ]
+     ```
+   - Click "OK" to save
+   - Restart Anki for changes to take effect
 
 ## Testing the Extension
 
