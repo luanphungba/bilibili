@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "Bilibili Language Learning Loop",
+  "version": "1.0",
+  "description": "Loop Bilibili videos for language learning with ChatGPT integration and Anki export",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://www.bilibili.com/*",
+    "https://api.openai.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://www.bilibili.com/*"],
+      "js": ["content.js"],
+      "css": ["styles.css"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Bilibili Language Learning Loop"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["injected.js"],
+      "matches": ["https://www.bilibili.com/*"]
+    }
+  ]
+} 
