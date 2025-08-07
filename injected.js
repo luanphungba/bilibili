@@ -14,6 +14,12 @@
       this.originalVolume = 1;
       this.originalPlaybackRate = 1;
       
+      // Transcript capture properties
+      this.transcriptObserver = null;
+      this.isTranscriptCaptureEnabled = false;
+      this.capturedTranscripts = new Set();
+      this.lastTranscriptText = '';
+      
       this.init();
     }
     
@@ -21,6 +27,7 @@
       this.findVideo();
       this.setupEventListeners();
       this.createControlPanel();
+      this.setupTranscriptCapture();
       this.handleUrlParameters();
     }
     
@@ -72,6 +79,17 @@
         this.video.addEventListener('timeupdate', () => {
           this.handleTimeUpdate();
         });
+        
+        // Listen for play/pause events to control transcript capture
+        this.video.addEventListener('play', () => {
+          if (this.isTranscriptCaptureEnabled) {
+            this.startTranscriptCapture();
+          }
+        });
+        
+        this.video.addEventListener('pause', () => {
+          this.stopTranscriptCapture();
+        });
       }
     }
     
@@ -114,7 +132,7 @@
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">End Time (s):</label>
             <input type="number" id="loop-end-input" style="width: 100%; padding: 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.9); color: #333;" value="60" min="0">
           </div>
-          <div style="margin-bottom: 15px;">
+          <div style="margin-bottom: 8px;">
             <label style="display: block; margin-bottom: 4px; font-weight: 500;">Speed:</label>
             <select id="loop-speed-input" style="width: 100%; padding: 8px; border: none; border-radius: 6px; background: rgba(255,255,255,0.9); color: #333;">
               <option value="0.5">0.5x</option>
@@ -125,11 +143,22 @@
               <option value="2">2x</option>
             </select>
           </div>
+          <div style="margin-bottom: 15px;">
+            <label style="display: flex; align-items: center; gap: 8px; font-weight: 500; cursor: pointer;">
+              <input type="checkbox" id="transcript-capture-checkbox" style="margin: 0;">
+              <span>Auto-capture subtitles</span>
+            </label>
+            <div id="transcript-status" style="font-size: 12px; color: rgba(255,255,255,0.8); margin-top: 4px;">Subtitle capture disabled</div>
+          </div>
         </div>
         
         <div style="display: flex; gap: 10px; margin-bottom: 15px;">
           <button id="loop-start-btn" style="flex: 1; padding: 10px; border: none; border-radius: 6px; background: #4CAF50; color: white; cursor: pointer; font-weight: 500; transition: background 0.2s;">Start Loop</button>
           <button id="loop-stop-btn" style="flex: 1; padding: 10px; border: none; border-radius: 6px; background: #f44336; color: white; cursor: pointer; font-weight: 500; transition: background 0.2s;">Stop Loop</button>
+        </div>
+        
+        <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+          <button id="clear-transcript-btn" style="flex: 1; padding: 8px; border: none; border-radius: 6px; background: #FF9800; color: white; cursor: pointer; font-weight: 500; transition: background 0.2s; font-size: 12px;">Clear Subtitles</button>
         </div>
         
         <div style="margin-bottom: 15px;">
@@ -213,7 +242,19 @@
         this.toggleAnalysisEdit();
       });
       
-
+      // Add event listeners for loop control buttons
+      document.getElementById('loop-start-btn').addEventListener('click', () => {
+        this.startLoop();
+      });
+      
+      document.getElementById('loop-stop-btn').addEventListener('click', () => {
+        this.stopLoop();
+      });
+      
+      // Add event listener for clear transcript button
+      document.getElementById('clear-transcript-btn').addEventListener('click', () => {
+        this.clearCapturedTranscripts();
+      });
       
       // Add hover effects
       const buttons = panel.querySelectorAll('button');
@@ -331,6 +372,11 @@
       
       this.isLooping = true;
       
+      // Start transcript capture if enabled
+      if (this.isTranscriptCaptureEnabled) {
+        this.startTranscriptCapture();
+      }
+      
       // Start monitoring
       this.loopInterval = setInterval(() => {
         if (!this.isLooping || !this.video) return;
@@ -343,6 +389,7 @@
       
       this.updateStatus();
       this.updateLoopUrl();
+      this.updateTranscriptStatus();
       
       this.showMessage(`Loop started: ${this.startTime}s to ${this.endTime}s`, 'success');
       console.log(`Loop started: ${this.startTime}s to ${this.endTime}s at ${speed}x speed`);
@@ -369,6 +416,7 @@
       }
       
       this.updateStatus();
+      this.updateTranscriptStatus();
       this.showMessage('Loop stopped and video paused', 'info');
       console.log('Loop stopped and video paused');
     }
@@ -459,7 +507,7 @@ Format the response in HTML with clear sections.`;
                     content: prompt
                   }
                 ],
-                max_tokens: 1000,
+                max_tokens: 10000,
                 temperature: 0.7
               })
             }).then(response => {
@@ -518,6 +566,159 @@ Format the response in HTML with clear sections.`;
     handleTimeUpdate() {
       // Time display removed to make panel more compact
       // Video time updates are handled by the video player itself
+    }
+    
+    // Transcript capture methods
+    setupTranscriptCapture() {
+      // Set up checkbox event listener
+      setTimeout(() => {
+        const checkbox = document.getElementById('transcript-capture-checkbox');
+        if (checkbox) {
+          checkbox.addEventListener('change', (e) => {
+            this.isTranscriptCaptureEnabled = e.target.checked;
+            this.updateTranscriptStatus();
+            
+            if (this.isTranscriptCaptureEnabled) {
+              // Start capturing if video is playing
+              if (this.video && !this.video.paused) {
+                this.startTranscriptCapture();
+              }
+            } else {
+              this.stopTranscriptCapture();
+            }
+          });
+        }
+      }, 100);
+    }
+    
+    startTranscriptCapture() {
+      if (!this.isTranscriptCaptureEnabled || this.transcriptPollingInterval) {
+        return;
+      }
+      
+      console.log('Starting transcript capture with polling approach...');
+      this.updateTranscriptStatus('Capturing subtitles...');
+      
+      // Function to find subtitle element (may change during playback)
+      const findSubtitleElement = () => {
+        const transcriptSelectors = [
+          '.bili-subtitle-x-subtitle-panel-text',
+          '[class*="bili-subtitle-x-subtitle-panel-text"]',
+          '.bpx-player-subtitle-panel-text',
+          '[role="caption"]'
+        ];
+        
+        for (const selector of transcriptSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            return element;
+          }
+        }
+        return null;
+      };
+      
+      // Polling function to check for subtitle changes
+      const checkSubtitles = () => {
+        if (!this.isTranscriptCaptureEnabled) {
+          return;
+        }
+        
+        const subtitleElement = findSubtitleElement();
+        if (!subtitleElement) {
+          return;
+        }
+        
+        const currentText = subtitleElement.textContent?.trim();
+        if (currentText && currentText !== this.lastTranscriptText && !this.capturedTranscripts.has(currentText)) {
+          console.log('Captured new subtitle:', currentText);
+          this.captureTranscriptText(currentText);
+        }
+      };
+      
+      // Start aggressive polling every 50ms for responsive capture
+      this.transcriptPollingInterval = setInterval(checkSubtitles, 50);
+      
+      // Capture initial text if present
+      const initialElement = findSubtitleElement();
+      if (initialElement) {
+        console.log('Found initial subtitle element:', initialElement);
+        const initialText = initialElement.textContent?.trim();
+        if (initialText && !this.capturedTranscripts.has(initialText)) {
+          console.log('Capturing initial subtitle:', initialText);
+          this.captureTranscriptText(initialText);
+        }
+      } else {
+        console.log('No subtitle element found initially, will keep polling...');
+      }
+    }
+    
+    stopTranscriptCapture() {
+      console.log('Stopping transcript capture...');
+      if (this.transcriptPollingInterval) {
+        clearInterval(this.transcriptPollingInterval);
+        this.transcriptPollingInterval = null;
+        console.log('Polling interval cleared');
+      }
+      this.updateTranscriptStatus('Subtitle capture stopped');
+    }
+    
+    captureTranscriptText(text) {
+      if (!text || this.capturedTranscripts.has(text)) {
+        return;
+      }
+      
+      // Add to captured set to avoid duplicates
+      this.capturedTranscripts.add(text);
+      this.lastTranscriptText = text;
+      
+      // Append to Chinese text input
+      const textInput = document.getElementById('chinese-text-input');
+      if (textInput) {
+        const currentValue = textInput.value.trim();
+        const newValue = currentValue ? currentValue + '\n' + text : text;
+        textInput.value = newValue;
+        
+        // Auto-scroll to bottom
+        textInput.scrollTop = textInput.scrollHeight;
+        
+        console.log('Captured transcript:', text);
+      }
+    }
+    
+    updateTranscriptStatus(customMessage = null) {
+      const statusElement = document.getElementById('transcript-status');
+      if (statusElement) {
+        if (customMessage) {
+          statusElement.textContent = customMessage;
+          statusElement.style.color = 'rgba(76, 175, 80, 0.9)';
+        } else if (this.isTranscriptCaptureEnabled) {
+          if (this.video && !this.video.paused) {
+            statusElement.textContent = 'Waiting for subtitles...';
+            statusElement.style.color = 'rgba(255, 193, 7, 0.9)';
+          } else {
+            statusElement.textContent = 'Ready to capture (play video)';
+            statusElement.style.color = 'rgba(255,255,255,0.8)';
+          }
+        } else {
+          statusElement.textContent = 'Subtitle capture disabled';
+          statusElement.style.color = 'rgba(255,255,255,0.8)';
+        }
+      }
+    }
+    
+    clearCapturedTranscripts() {
+      // Clear the captured transcripts set
+      this.capturedTranscripts.clear();
+      this.lastTranscriptText = '';
+      
+      // Clear the Chinese text input
+      const textInput = document.getElementById('chinese-text-input');
+      if (textInput) {
+        textInput.value = '';
+      }
+      
+      this.showMessage('Subtitles cleared', 'info');
+      console.log('Captured transcripts cleared');
     }
     
     updateStatus() {

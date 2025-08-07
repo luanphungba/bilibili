@@ -67,7 +67,7 @@ window.addEventListener('message', async (event) => {
         
         // Prepare data for template replacement
         const templateData = {
-          chineseText: chineseText,
+          chineseText: chineseText.replace(/\n/g, '<br>'),
           analysis: formatAnalysisForAnki(analysisContent),
           loopUrl: loopUrl,
           startTime: startTime || 0,
